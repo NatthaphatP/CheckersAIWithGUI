@@ -2,24 +2,23 @@ import CheckersRules.*
 
 import scala.util.boundary
 import scala.util.Random
+import scala.concurrent._
+import ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object CheckersAI {
   val AI_DEPTH = 100
 
   def minimax(board: Board,
-    depth: Int,
-    isMaximizing: Boolean,
-    alpha: Double,
-    beta: Double
-    ): Double = boundary {
+              depth: Int,
+              isMaximizing: Boolean,
+              alpha: Double,
+              beta: Double): Double = boundary {
     if (depth == 0 || isGameOver(board)) {
-      // Evaluate from the perspective of the maximizing player
       return evaluateBoard(board, isMaximizing)
     } else {
-      // Generate moves for the current player
       val possibleMoves = generateMoves(board, isMaximizing)
       if (possibleMoves.isEmpty) {
-        // If no moves are available, this player loses
         return if (isMaximizing) Double.NegativeInfinity else Double.PositiveInfinity
       } else {
         var (a, b) = (alpha, beta)
@@ -31,10 +30,7 @@ object CheckersAI {
             val eval = minimax(newBoard, depth - 1, isMaximizing = false, a, b)
             maxEval = math.max(maxEval, eval)
             a = math.max(a, maxEval)
-            if (b <= a) {
-              // Prune the remaining branches
-              boundary.break(maxEval)
-            }
+            if (b <= a) boundary.break(maxEval)
           }
           maxEval
         } else {
@@ -44,10 +40,7 @@ object CheckersAI {
             val eval = minimax(newBoard, depth - 1, isMaximizing = true, a, b)
             minEval = math.min(minEval, eval)
             b = math.min(b, minEval)
-            if (b <= a) {
-              // Prune the remaining branches
-              boundary.break(minEval)
-            }
+            if (b <= a) boundary.break(minEval)
           }
           minEval
         }
@@ -59,8 +52,13 @@ object CheckersAI {
     val pieceValue = 1.0
     val kingValue = 4.0
 
-    def pieceScore(piece: Piece, row: Int, col: Int): Double = {
-      if (piece.isKing) kingValue else pieceValue
+    def isCenter(col: Int): Boolean = col >= 2 && col <= 5
+
+    def positionalValue(piece: Piece, row: Int, col: Int): Double = {
+      val centerBonus = if (isCenter(col)) 0.2 else 0.0
+      val forwardBonus = if (piece.isBlack) (7 - row) * 0.05 else row * 0.05
+      val kingMobility = if (piece.isKing) countPieceMoves(board, row, col) * 0.05 else 0.0
+      centerBonus + forwardBonus + kingMobility
     }
 
     val scores = for {
@@ -68,26 +66,34 @@ object CheckersAI {
       (piece, cIdx) <- row.zipWithIndex
       if piece != Empty
     } yield {
+      val base = if (piece.isKing) kingValue else pieceValue
+      val positionBonus = positionalValue(piece, rIdx, cIdx)
       val sign = if (piece.isBlack == isBlackTurn) 1 else -1
-      sign * pieceScore(piece, rIdx, cIdx)
+      sign * (base + positionBonus)
     }
 
-    // Use small random value to break ties
-    scores.sum + (Random.nextDouble() * 0.1)
+    scores.sum + (Random.nextDouble() * 0.01) // tiny randomness to break ties
+  }
+
+  def countPieceMoves(board: Board, row: Int, col: Int): Int = {
+    val piece = board(row)(col)
+    if (piece == Empty) return 0
+    generateMoves(board, piece.isBlack).count(move =>
+      move.fromRow == row && move.fromCol == col
+    )
   }
 
   def bestMove(board: Board, isBlackTurn: Boolean, maxDepth: Int, timeLimitMillis: Long): Option[Move] = {
     val moves = generateMoves(board, isBlackTurn)
     if (moves.isEmpty) {
       println("No valid moves available.")
-      return None // No valid moves available
+      return None
     }
     if (moves.size == 1) {
       println("Only one possible move. Returning it immediately.")
-      return Some(moves.head) // Return the only move immediately without any calculation
+      return Some(moves.head)
     }
 
-    // Multiple moves available, use iterative deepening
     println(s"${moves.size} possible moves. Starting search...")
     iterativeDeepening(board, isBlackTurn, maxDepth, timeLimitMillis)
   }
@@ -123,26 +129,24 @@ object CheckersAI {
 
     val startTime = System.nanoTime()
 
-    var bestMove: Option[Move] = None
-    var maxEval = Double.NegativeInfinity
-
-    val moveIterator = moves.iterator
-    while (moveIterator.hasNext) {
-      val move = moveIterator.next()
-      val elapsedMillis = (System.nanoTime() - startTime) / 1_000_000
-      if (elapsedMillis >= timeLimitMillis) {
-        return None
-      }
-
-      val newBoard = applyMove(board, move)
-      val eval = minimax(newBoard, depth - 1, !isBlackTurn, Double.NegativeInfinity, Double.PositiveInfinity)
-      if (eval > maxEval) {
-        maxEval = eval
-        bestMove = Some(move)
+    // Parallel evaluation using Futures
+    val futures = moves.map { move =>
+      Future {
+        val newBoard = applyMove(board, move)
+        val eval = minimax(newBoard, depth - 1, !isBlackTurn, Double.NegativeInfinity, Double.PositiveInfinity)
+        (move, eval)
       }
     }
 
-    println(f"Best move at depth $depth: $bestMove with eval: $maxEval%.2f")
-    bestMove
+    try {
+      val results = Await.result(Future.sequence(futures), Duration(timeLimitMillis, MILLISECONDS))
+      val best = results.maxBy(_._2)
+      println(f"Best move at depth $depth: ${best._1} with eval: ${best._2}%.2f")
+      Some(best._1)
+    } catch {
+      case _: TimeoutException =>
+        println("Parallel evaluation exceeded time limit.")
+        None
+    }
   }
 }
