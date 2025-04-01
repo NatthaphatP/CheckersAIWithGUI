@@ -128,4 +128,28 @@ object CheckersRules {
     val isBlack = false
     val isKing = false
   }
+
+  case class GameState(
+                        board: Board,
+                        moveHistory: List[Board],
+                        noCaptureCount: Int
+                      ) {
+    def isDraw: Boolean = {
+      noCaptureCount >= 40 || isThreefoldRepetition
+    }
+
+    def isThreefoldRepetition: Boolean = {
+      moveHistory.count(_ == board) >= 3
+    }
+
+    def applyMove(move: Move): GameState = {
+      val newBoard = CheckersRules.applyMove(board, move)
+      val wasCapture = move.jumped.isDefined
+      GameState(
+        board = newBoard,
+        moveHistory = (newBoard :: moveHistory).take(100),
+        noCaptureCount = if (wasCapture) 0 else noCaptureCount + 1
+      )
+    }
+  }
 }
