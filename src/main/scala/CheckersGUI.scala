@@ -25,6 +25,12 @@ object CheckersGUI extends JFXApp3 {
   val AI_TIME_LIMIT_MS = 5000
   val AI_DEPTH = 100
 
+  var blackWins = 0
+  var whiteWins = 0
+  var draws = 0
+  var gameCount = 0
+  val totalGames = 10
+
   override def start(): Unit = {
     val canvas = new Canvas(BoardSize * SquareSize, BoardSize * SquareSize)
     val gc = canvas.graphicsContext2D
@@ -101,25 +107,13 @@ object CheckersGUI extends JFXApp3 {
       }
     }
 
-    draw()
-
-    def handleMouseMoveAndDrag(e: MouseEvent): Unit = {
-      val c = (e.getX / SquareSize).toInt
-      val r = (e.getY / SquareSize).toInt
-      if (isValidPosition(r, c)) {
-        hoveredPiece = Some((r, c))
-        draw()
-      }
-    }
-
-    canvas.onMouseMoved = handleMouseMoveAndDrag
-    canvas.onMouseDragged = handleMouseMoveAndDrag
-
-    def checkForDraw(): Unit = {
-      if (gameState.isDraw) {
-        println("Game drawn by 40-move rule or threefold repetition.")
-        System.exit(0)
-      }
+    def resetGame(): Unit = {
+      gameState = GameState(initialBoard(), Nil, 0)
+      selected = None
+      hoveredPiece = None
+      previousMove = None
+      isBlackTurn = true
+      draw()
     }
 
     def scheduleNextAIJump(currentMove: Move): Unit = {
@@ -140,7 +134,6 @@ object CheckersGUI extends JFXApp3 {
             previousMove = Some(bestJump)
             gameState = gameState.applyMove(bestJump)
             draw()
-            checkForDraw()
             scheduleNextAIJump(bestJump)
           }
         }.play()
@@ -154,11 +147,38 @@ object CheckersGUI extends JFXApp3 {
 
     def endPlayerTurn(): Unit = {
       if (isGameOver(board)) {
-        checkForDraw()
-        println("Game over!")
-        new PauseTransition(Duration(2500)) {
-          onFinished = _ => System.exit(0)
-        }.play()
+        val blackHasMoves = generateMoves(board, isBlackTurn = true).nonEmpty
+        val whiteHasMoves = generateMoves(board, isBlackTurn = false).nonEmpty
+
+        val winner = (blackHasMoves, whiteHasMoves) match {
+          case (true, false) => "Black"
+          case (false, true) => "White"
+          case _ => "None"
+        }
+
+        if (winner == "None" || gameState.isDraw) {
+          draws += 1
+          println("Game drawn.")
+        } else {
+          if (winner == "Black") blackWins += 1 else whiteWins += 1
+          println(s"Game over! $winner wins.")
+        }
+
+        println(s"Score after game ${gameCount + 1}:")
+        println(s"Black (SeqAI): $blackWins | White (ParAI): $whiteWins | Draws: $draws\n")
+
+        gameCount += 1
+
+        if (gameCount >= totalGames) {
+          println("All games completed.")
+        } else {
+          new PauseTransition(Duration(2000)) {
+            onFinished = _ => {
+              resetGame()
+              endPlayerTurn()
+            }
+          }.play()
+        }
       } else {
         new PauseTransition(Duration(500)) {
           onFinished = _ => {
@@ -175,7 +195,6 @@ object CheckersGUI extends JFXApp3 {
                 previousMove = Some(am)
                 gameState = gameState.applyMove(am)
                 draw()
-                checkForDraw()
                 if (am.jumped.isDefined) {
                   scheduleNextAIJump(am)
                 } else {
@@ -196,6 +215,15 @@ object CheckersGUI extends JFXApp3 {
       }
     }
 
+    canvas.onMouseMoved = (e: MouseEvent) => {
+      val c = (e.getX / SquareSize).toInt
+      val r = (e.getY / SquareSize).toInt
+      if (isValidPosition(r, c)) {
+        hoveredPiece = Some((r, c))
+        draw()
+      }
+    }
+
     canvas.onMousePressed = (e: MouseEvent) => {}
     canvas.onMouseReleased = (e: MouseEvent) => {}
 
@@ -208,6 +236,8 @@ object CheckersGUI extends JFXApp3 {
       }
     }
 
+    draw()
     endPlayerTurn()
   }
 }
+
