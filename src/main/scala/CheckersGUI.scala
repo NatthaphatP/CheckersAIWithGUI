@@ -1,5 +1,6 @@
-import CheckersAI.*
 import CheckersRules.*
+import SeqCheckersAI.*
+import ParCheckersAI.*
 import javafx.scene.input.MouseEvent
 import scalafx.animation.PauseTransition
 import scalafx.application.JFXApp3
@@ -12,19 +13,17 @@ import scalafx.scene.paint.Color
 import scalafx.scene.text.Font
 import scalafx.util.Duration
 
-import java.io.{OutputStream, PrintStream}
-import scala.annotation.tailrec
+import java.io.PrintStream
 
 object CheckersGUI extends JFXApp3 {
-  // GUI State
   var gameState: GameState = GameState(initialBoard(), Nil, 0)
   def board: Board = gameState.board
   var selected: Option[(Int, Int)] = None
   var isBlackTurn = true
   var hoveredPiece: Option[(Int, Int)] = None
   var previousMove: Option[Move] = None
-  var aiStartTime: Long = 0L
   val AI_TIME_LIMIT_MS = 5000
+  val AI_DEPTH = 100
 
   override def start(): Unit = {
     val canvas = new Canvas(BoardSize * SquareSize, BoardSize * SquareSize)
@@ -95,7 +94,7 @@ object CheckersGUI extends JFXApp3 {
           if (move.jumped.nonEmpty) {
             gc.fill = Color.Red
             move.jumped.foreach { case (jr, jc) =>
-              gc.fillOval(jc * SquareSize + SquareSize/2 - 5, jr * SquareSize + SquareSize/2 - 5, 10, 10)
+              gc.fillOval(jc * SquareSize + SquareSize / 2 - 5, jr * SquareSize + SquareSize / 2 - 5, 10, 10)
             }
           }
         }
@@ -116,39 +115,6 @@ object CheckersGUI extends JFXApp3 {
     canvas.onMouseMoved = handleMouseMoveAndDrag
     canvas.onMouseDragged = handleMouseMoveAndDrag
 
-    canvas.onMousePressed = (e: MouseEvent) => {
-      val c = (e.getX / SquareSize).toInt
-      val r = (e.getY / SquareSize).toInt
-      if (isValidPosition(r, c) && board(r)(c) != Empty && board(r)(c).isBlack == isBlackTurn) {
-        selected = Some((r, c))
-        println(s"Piece selected at: ($r, $c)")
-      }
-    }
-
-    canvas.onMouseReleased = (e: MouseEvent) => {
-      val c = (e.getX / SquareSize).toInt
-      val r = (e.getY / SquareSize).toInt
-      selected match {
-        case Some((sr, sc)) =>
-          val validMoves = generateMoves(board, isBlackTurn)
-          val move = validMoves.find(m => m.fromRow == sr && m.fromCol == sc && m.toRow == r && m.toCol == c)
-          move match {
-            case Some(m) =>
-              println(s"Move applied: $m")
-              gameState = gameState.applyMove(m)
-              previousMove = Some(m)
-              draw()
-              checkForDraw()
-              endPlayerTurn()
-            case None =>
-              println(s"Invalid move from ($sr, $sc) to ($r, $c)")
-              selected = None
-              draw()
-          }
-        case None => println("No piece selected")
-      }
-    }
-
     def checkForDraw(): Unit = {
       if (gameState.isDraw) {
         println("Game drawn by 40-move rule or threefold repetition.")
@@ -164,11 +130,12 @@ object CheckersGUI extends JFXApp3 {
       if (additionalJumps.nonEmpty) {
         new PauseTransition(Duration(500)) {
           onFinished = _ => {
-            val bestJump = if (additionalJumps.size == 1) {
-              additionalJumps.head
-            } else {
-              bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
-            }
+            val bestJump =
+              if (isBlackTurn)
+                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
+              else
+                ParCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
+
             println(s"AI multi-jump: $bestJump")
             previousMove = Some(bestJump)
             gameState = gameState.applyMove(bestJump)
@@ -178,13 +145,13 @@ object CheckersGUI extends JFXApp3 {
           }
         }.play()
       } else {
-        isBlackTurn = true
+        isBlackTurn = !isBlackTurn
         selected = None
         draw()
+        endPlayerTurn()
       }
     }
 
-    @tailrec
     def endPlayerTurn(): Unit = {
       if (isGameOver(board)) {
         checkForDraw()
@@ -193,67 +160,54 @@ object CheckersGUI extends JFXApp3 {
           onFinished = _ => System.exit(0)
         }.play()
       } else {
-        if (!isBlackTurn) {
-          new PauseTransition(Duration(500)) {
-            onFinished = _ => {
-              println("AI is thinking...")
-              val availableMoves = generateMoves(board, isBlackTurn)
-              val aiMove = if (availableMoves.size == 1) Some(availableMoves.head)
-              else bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+        new PauseTransition(Duration(500)) {
+          onFinished = _ => {
+            println(s"${if (isBlackTurn) "Black" else "White"} AI is thinking...")
+            val aiMove =
+              if (isBlackTurn)
+                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+              else
+                ParCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
 
-              aiMove.foreach { am =>
+            aiMove match {
+              case Some(am) =>
                 println(s"AI move: $am")
                 previousMove = Some(am)
                 gameState = gameState.applyMove(am)
                 draw()
                 checkForDraw()
-                if (am.jumped.isDefined) scheduleNextAIJump(am)
-                else {
-                  isBlackTurn = true
+                if (am.jumped.isDefined) {
+                  scheduleNextAIJump(am)
+                } else {
+                  isBlackTurn = !isBlackTurn
                   selected = None
                   draw()
+                  endPlayerTurn()
                 }
-              }
 
-              if (aiMove.isEmpty || aiMove.exists(_.jumped.isEmpty)) {
-                isBlackTurn = true
+              case None =>
+                isBlackTurn = !isBlackTurn
                 selected = None
                 draw()
-              }
-            }
-          }.play()
-        } else {
-          var hasAdditionalJumps = false
-          previousMove.foreach { pm =>
-            if (pm.jumped.isDefined) {
-              val additionalJumps = generateMoves(board, isBlackTurn).filter(move =>
-                move.fromRow == pm.toRow && move.fromCol == pm.toCol && move.jumped.isDefined)
-              if (additionalJumps.nonEmpty) {
-                println("You have additional jumps available. Continue jumping!")
-                selected = Some((pm.toRow, pm.toCol))
-                draw()
-                hasAdditionalJumps = true
-              }
+                endPlayerTurn()
             }
           }
-
-          if (!hasAdditionalJumps) {
-            isBlackTurn = false
-            selected = None
-            draw()
-            endPlayerTurn()
-          }
-        }
+        }.play()
       }
     }
 
+    canvas.onMousePressed = (e: MouseEvent) => {}
+    canvas.onMouseReleased = (e: MouseEvent) => {}
+
     stage = new PrimaryStage {
-      title = "Checkers AI"
+      title = "Checkers AI vs AI"
       scene = new Scene(BoardSize * SquareSize, BoardSize * SquareSize + 100) {
         content = new VBox {
           children = Seq(canvas, textArea)
         }
       }
     }
+
+    endPlayerTurn()
   }
 }

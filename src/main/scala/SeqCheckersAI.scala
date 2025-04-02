@@ -3,7 +3,7 @@ import CheckersRules.*
 import scala.util.boundary
 import scala.util.Random
 
-object CheckersAI {
+object SeqCheckersAI {
   val AI_DEPTH = 100
 
   def minimax(board: Board,
