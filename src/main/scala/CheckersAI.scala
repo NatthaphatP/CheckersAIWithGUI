@@ -5,6 +5,7 @@ import scala.util.Random
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import java.util.concurrent.TimeoutException
 
 object CheckersAI {
   val AI_DEPTH = 100
@@ -13,9 +14,10 @@ object CheckersAI {
               depth: Int,
               isMaximizing: Boolean,
               alpha: Double,
-              beta: Double): Double = boundary {
+              beta: Double
+             ): Double = boundary {
     if (depth == 0 || isGameOver(board)) {
-      return quiescence(board, isMaximizing, alpha, beta, 4) // depth-limited
+      return evaluateBoard(board, isMaximizing)
     } else {
       val possibleMoves = generateMoves(board, isMaximizing)
       if (possibleMoves.isEmpty) {
@@ -48,65 +50,24 @@ object CheckersAI {
     }
   }
 
-  def quiescence(board: Board, isBlackTurn: Boolean, alpha: Double, beta: Double, depth: Int): Double = {
-    val standPat = evaluateBoard(board, isBlackTurn)
-    var a = math.max(alpha, standPat)
-    if (a >= beta || depth == 0) return standPat
-
-    val captureMoves = generateMoves(board, isBlackTurn).filter(_.jumped.isDefined)
-    if (captureMoves.isEmpty) return standPat
-
-    var value = standPat
-    for (move <- captureMoves) {
-      val newBoard = applyMove(board, move)
-      val score = -quiescence(newBoard, !isBlackTurn, -beta, -a, depth - 1)
-      value = math.max(value, score)
-      a = math.max(a, score)
-      if (a >= beta) return beta
-    }
-    value
-  }
-
   def evaluateBoard(board: Board, isBlackTurn: Boolean): Double = {
     val pieceValue = 1.0
     val kingValue = 4.0
-    val captureBonus = 0.6         // Reduced from 1.5
-    val trappedPenalty = 0.4       // Reduced from 0.8
 
-    def isCenter(col: Int): Boolean = col >= 2 && col <= 5
-
-    def positionalValue(piece: Piece, row: Int, col: Int): Double = {
-      val centerBonus = if (isCenter(col)) 0.2 else 0.0
-      val forwardBonus = if (piece.isBlack) (7 - row) * 0.05 else row * 0.05
-      val mobility = countPieceMoves(board, row, col)
-      val kingMobility = if (piece.isKing) mobility * 0.05 else 0.0
-      val isTrapped = piece.isKing && mobility == 0
-      val trapPenalty = if (isTrapped) -trappedPenalty else 0.0
-      centerBonus + forwardBonus + kingMobility + trapPenalty
+    def pieceScore(piece: Piece, row: Int, col: Int): Double = {
+      if (piece.isKing) kingValue else pieceValue
     }
 
-    val baseScores = for {
+    val scores = for {
       (row, rIdx) <- board.zipWithIndex
       (piece, cIdx) <- row.zipWithIndex
       if piece != Empty
     } yield {
-      val base = if (piece.isKing) kingValue else pieceValue
-      val positionBonus = positionalValue(piece, rIdx, cIdx)
       val sign = if (piece.isBlack == isBlackTurn) 1 else -1
-      sign * (base + positionBonus)
+      sign * pieceScore(piece, rIdx, cIdx)
     }
 
-    val captureCount = generateMoves(board, isBlackTurn).count(_.jumped.isDefined)
-
-    baseScores.sum + (captureCount * captureBonus) + (Random.nextDouble() * 0.001) // less randomness
-  }
-
-  def countPieceMoves(board: Board, row: Int, col: Int): Int = {
-    val piece = board(row)(col)
-    if (piece == Empty) return 0
-    generateMoves(board, piece.isBlack).count(m =>
-      m.fromRow == row && m.fromCol == col
-    )
+    scores.sum + (Random.nextDouble() * 0.1) // slight randomness to break ties
   }
 
   def bestMove(board: Board, isBlackTurn: Boolean, maxDepth: Int, timeLimitMillis: Long): Option[Move] = {
@@ -152,8 +113,6 @@ object CheckersAI {
   def bestMoveAtDepth(board: Board, isBlackTurn: Boolean, depth: Int, timeLimitMillis: Long): Option[Move] = {
     val moves = generateMoves(board, isBlackTurn)
     if (moves.isEmpty) return None
-
-    val startTime = System.nanoTime()
 
     val futures = moves.map { move =>
       Future {
