@@ -7,11 +7,11 @@ object CheckersAI {
   val AI_DEPTH = 100
 
   def minimax(board: Board,
-    depth: Int,
-    isMaximizing: Boolean,
-    alpha: Double,
-    beta: Double
-    ): Double = boundary {
+              depth: Int,
+              isMaximizing: Boolean,
+              alpha: Double,
+              beta: Double
+             ): Double = boundary {
     if (depth == 0 || isGameOver(board)) {
       // Evaluate from the perspective of the maximizing player
       return evaluateBoard(board, isMaximizing)
