@@ -126,9 +126,9 @@ object CheckersGUI extends JFXApp3 {
           onFinished = _ => {
             val bestJump =
               if (isBlackTurn)
-                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
-              else
                 ParCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
+              else
+                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
 
             println(s"AI multi-jump: $bestJump")
             previousMove = Some(bestJump)
@@ -165,7 +165,7 @@ object CheckersGUI extends JFXApp3 {
         }
 
         println(s"Score after game ${gameCount + 1}:")
-        println(s"Black (SeqAI): $blackWins | White (ParAI): $whiteWins | Draws: $draws\n")
+        println(s"Black (ParAI): $blackWins | White (SeqAI): $whiteWins | Draws: $draws\n")
 
         gameCount += 1
 
@@ -185,9 +185,9 @@ object CheckersGUI extends JFXApp3 {
             println(s"${if (isBlackTurn) "Black" else "White"} AI is thinking...")
             val aiMove =
               if (isBlackTurn)
-                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
-              else
                 ParCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+              else
+                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
 
             aiMove match {
               case Some(am) =>
@@ -240,4 +240,3 @@ object CheckersGUI extends JFXApp3 {
     endPlayerTurn()
   }
 }
-

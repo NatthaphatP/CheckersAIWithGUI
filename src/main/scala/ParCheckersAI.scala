@@ -1,6 +1,7 @@
-import CheckersRules.*
-
-import scala.util.boundary
+import CheckersRules._
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 object ParCheckersAI {
@@ -10,16 +11,14 @@ object ParCheckersAI {
               depth: Int,
               isMaximizing: Boolean,
               alpha: Double,
-              beta: Double
-             ): Double = boundary {
+              beta: Double,
+              isBlackTurn: Boolean
+             ): Double = {
     if (depth == 0 || isGameOver(board)) {
-      // Evaluate from the perspective of the maximizing player
-      return evaluateBoard(board, isMaximizing)
+      return evaluateBoard(board, isBlackTurn)
     } else {
-      // Generate moves for the current player
       val possibleMoves = generateMoves(board, isMaximizing)
       if (possibleMoves.isEmpty) {
-        // If no moves are available, this player loses
         return if (isMaximizing) Double.NegativeInfinity else Double.PositiveInfinity
       } else {
         var (a, b) = (alpha, beta)
@@ -28,26 +27,20 @@ object ParCheckersAI {
           var maxEval = Double.NegativeInfinity
           for (move <- possibleMoves) {
             val newBoard = applyMove(board, move)
-            val eval = minimax(newBoard, depth - 1, isMaximizing = false, a, b)
+            val eval = minimax(newBoard, depth - 1, false, a, b, isBlackTurn)
             maxEval = math.max(maxEval, eval)
             a = math.max(a, maxEval)
-            if (b <= a) {
-              // Prune the remaining branches
-              boundary.break(maxEval)
-            }
+            if (b <= a) return maxEval
           }
           maxEval
         } else {
           var minEval = Double.PositiveInfinity
           for (move <- possibleMoves) {
             val newBoard = applyMove(board, move)
-            val eval = minimax(newBoard, depth - 1, isMaximizing = true, a, b)
+            val eval = minimax(newBoard, depth - 1, true, a, b, isBlackTurn)
             minEval = math.min(minEval, eval)
             b = math.min(b, minEval)
-            if (b <= a) {
-              // Prune the remaining branches
-              boundary.break(minEval)
-            }
+            if (b <= a) return minEval
           }
           minEval
         }
@@ -72,7 +65,6 @@ object ParCheckersAI {
       sign * pieceScore(piece, rIdx, cIdx)
     }
 
-    // Use small random value to break ties
     scores.sum + (Random.nextDouble() * 0.1)
   }
 
@@ -80,14 +72,13 @@ object ParCheckersAI {
     val moves = generateMoves(board, isBlackTurn)
     if (moves.isEmpty) {
       println("No valid moves available.")
-      return None // No valid moves available
+      return None
     }
     if (moves.size == 1) {
       println("Only one possible move. Returning it immediately.")
-      return Some(moves.head) // Return the only move immediately without any calculation
+      return Some(moves.head)
     }
 
-    // Multiple moves available, use iterative deepening
     println(s"${moves.size} possible moves. Starting search...")
     iterativeDeepening(board, isBlackTurn, maxDepth, timeLimitMillis)
   }
@@ -126,21 +117,22 @@ object ParCheckersAI {
     var bestMove: Option[Move] = None
     var maxEval = Double.NegativeInfinity
 
-    val moveIterator = moves.iterator
-    while (moveIterator.hasNext) {
-      val move = moveIterator.next()
-      val elapsedMillis = (System.nanoTime() - startTime) / 1_000_000
-      if (elapsedMillis >= timeLimitMillis) {
-        return None
-      }
-
-      val newBoard = applyMove(board, move)
-      val eval = minimax(newBoard, depth - 1, !isBlackTurn, Double.NegativeInfinity, Double.PositiveInfinity)
-      if (eval > maxEval) {
-        maxEval = eval
-        bestMove = Some(move)
+    val futures = moves.map { move =>
+      Future {
+        val newBoard = applyMove(board, move)
+        val eval = minimax(newBoard, depth - 1, false, Double.NegativeInfinity, Double.PositiveInfinity, isBlackTurn)
+        (move, eval)
       }
     }
+
+    val results = Await.result(Future.sequence(futures), Duration.Inf)
+
+    // Pick the best move based on evaluation
+    val (bestMoveResult, _) = results.maxBy(_._2)
+    bestMove = Some(bestMoveResult)
+
+    val elapsedMillis = (System.nanoTime() - startTime) / 1_000_000
+    if (elapsedMillis >= timeLimitMillis) return None
 
     println(f"Best move at depth $depth: $bestMove with eval: $maxEval%.2f")
     bestMove
