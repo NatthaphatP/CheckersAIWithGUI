@@ -22,14 +22,18 @@ object CheckersGUI extends JFXApp3 {
   var isBlackTurn = true
   var hoveredPiece: Option[(Int, Int)] = None
   var previousMove: Option[Move] = None
-  val AI_TIME_LIMIT_MS = 1000
-  val AI_DEPTH = 100
+  val AI_TIME_LIMIT_MS = 10000 // Set time limit for the AI
+  val AI_DEPTH = 10 // Depth limit for AI
 
   var blackWins = 0
   var whiteWins = 0
   var draws = 0
   var gameCount = 0
-  val totalGames = 3
+  val totalGames = 1
+
+  // Variables to track the total AI calculation time for sequential and parallel AIs
+  var totalSequentialTime: Long = 0
+  var totalParallelTime: Long = 0
 
   override def start(): Unit = {
     val canvas = new Canvas(BoardSize * SquareSize, BoardSize * SquareSize)
@@ -126,7 +130,7 @@ object CheckersGUI extends JFXApp3 {
           onFinished = _ => {
             val bestJump =
               if (isBlackTurn)
-                ParCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
+                ParCheckersAI.bestMove(board, isBlackTurn, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
               else
                 SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
 
@@ -167,6 +171,14 @@ object CheckersGUI extends JFXApp3 {
         println(s"Score after game ${gameCount + 1}:")
         println(s"Black (ParAI): $blackWins | White (SeqAI): $whiteWins | Draws: $draws\n")
 
+        // Print the total AI calculation time for both AIs
+        println(f"Total Sequential AI calculation time: ${totalSequentialTime / 1_000_000_000.0}%.6f seconds")
+        println(f"Total Parallel AI calculation time: ${totalParallelTime / 1_000_000_000.0}%.6f seconds")
+
+        // Reset the total time for the next game
+        totalSequentialTime = 0
+        totalParallelTime = 0
+
         gameCount += 1
 
         if (gameCount >= totalGames) {
@@ -183,11 +195,22 @@ object CheckersGUI extends JFXApp3 {
         new PauseTransition(Duration(500)) {
           onFinished = _ => {
             println(s"${if (isBlackTurn) "Black" else "White"} AI is thinking...")
-            val aiMove =
-              if (isBlackTurn)
-                ParCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
-              else
-                SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+
+            // Start tracking time before the AI move
+            val startTime = System.nanoTime()
+
+            val aiMove = SeqCheckersAI.bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+
+            // End time tracking after the AI move
+            val endTime = System.nanoTime()
+            val moveTime = endTime - startTime
+
+            // Accumulate time for either sequential or parallel AI
+            if (isBlackTurn) {
+              totalParallelTime += moveTime
+            } else {
+              totalSequentialTime += moveTime
+            }
 
             aiMove match {
               case Some(am) =>

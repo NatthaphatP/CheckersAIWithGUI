@@ -6,7 +6,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Random, boundary}
 
 object ParCheckersAI {
-  val AI_DEPTH = 100
+  val AI_DEPTH = 10  // Set the depth limit here
 
   def minimax(board: Board,
               depth: Int,
@@ -15,6 +15,7 @@ object ParCheckersAI {
               beta: Double,
               isBlackTurn: Boolean
              ): Double = boundary {
+    // Stop recursion if depth limit is reached or the game is over
     if (depth == 0 || isGameOver(board)) {
       return evaluateBoard(board, isBlackTurn)
     } else {
@@ -69,7 +70,7 @@ object ParCheckersAI {
     scores.sum + (Random.nextDouble() * 0.1)
   }
 
-  def bestMove(board: Board, isBlackTurn: Boolean, maxDepth: Int, timeLimitMillis: Long): Option[Move] = {
+  def bestMove(board: Board, isBlackTurn: Boolean, timeLimitMillis: Long): Option[Move] = {
     val moves = generateMoves(board, isBlackTurn)
     if (moves.isEmpty) {
       println("No valid moves available.")
@@ -81,61 +82,34 @@ object ParCheckersAI {
     }
 
     println(s"${moves.size} possible moves. Starting search...")
-    iterativeDeepening(board, isBlackTurn, maxDepth, timeLimitMillis)
+    benchmarkWithoutLimits(board, isBlackTurn, timeLimitMillis)
   }
 
-  def iterativeDeepening(board: Board, isBlackTurn: Boolean, maxDepth: Int, timeLimitMillis: Long): Option[Move] = {
+  def benchmarkWithoutLimits(board: Board, isBlackTurn: Boolean, timeLimitMillis: Long): Option[Move] = {
     var bestMove: Option[Move] = None
-    val aiStartTime = System.nanoTime()
-    var depth = 1
-    var timeLimitExceeded = false
+    val aiStartTime = System.nanoTime()  // Start time for benchmarking
 
-    while (depth <= maxDepth && !timeLimitExceeded) {
-      val elapsedMillis = (System.nanoTime() - aiStartTime) / 1_000_000
-      val remainingTime = timeLimitMillis - elapsedMillis
-
-      println(s"Searching at depth: $depth with remaining time: $remainingTime ms")
-      val tempBestMove = bestMoveAtDepth(board, isBlackTurn, depth, remainingTime)
-      if (tempBestMove.isEmpty) {
-        println(s"Time limit exceeded before starting depth $depth. Returning best move from depth ${depth - 1}.")
-        timeLimitExceeded = true
-      } else {
-        bestMove = tempBestMove
-        println(s"Finished searching at depth: $depth")
-        depth += 1
-      }
-    }
-
-    bestMove
-  }
-
-  def bestMoveAtDepth(board: Board, isBlackTurn: Boolean, depth: Int, timeLimitMillis: Long): Option[Move] = {
+    // Run the AI without a depth or time limit. It will search until the game is over or another stopping condition is met.
     val moves = generateMoves(board, isBlackTurn)
     if (moves.isEmpty) return None
 
-    val startTime = System.nanoTime()
-
-    var bestMove: Option[Move] = None
     var maxEval = Double.NegativeInfinity
+    var bestMoveFound: Option[Move] = None
 
-    val futures = moves.map { move =>
-      Future {
-        val newBoard = applyMove(board, move)
-        val eval = minimax(newBoard, depth - 1, false, Double.NegativeInfinity, Double.PositiveInfinity, isBlackTurn)
-        (move, eval)
+    moves.foreach { move =>
+      val newBoard = applyMove(board, move)
+      val eval = minimax(newBoard, AI_DEPTH, false, Double.NegativeInfinity, Double.PositiveInfinity, isBlackTurn)
+      if (eval > maxEval) {
+        maxEval = eval
+        bestMoveFound = Some(move)
       }
     }
 
-    val results = Await.result(Future.sequence(futures), Duration.Inf)
+    bestMove = bestMoveFound
 
-    // Pick the best move based on evaluation
-    val (bestMoveResult, _) = results.maxBy(_._2)
-    bestMove = Some(bestMoveResult)
+    val elapsedMillis = (System.nanoTime() - aiStartTime) / 1_000_000
+    println(f"Total time for move calculation: $elapsedMillis ms")  // Print time taken in milliseconds
 
-    val elapsedMillis = (System.nanoTime() - startTime) / 1_000_000
-    if (elapsedMillis >= timeLimitMillis) return None
-
-    println(f"Best move at depth $depth: $bestMove with eval: $maxEval%.2f")
     bestMove
   }
 }

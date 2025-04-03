@@ -4,22 +4,20 @@ import scala.util.boundary
 import scala.util.Random
 
 object SeqCheckersAI {
-  val AI_DEPTH = 100
+  val AI_DEPTH = 1
 
   def minimax(board: Board,
               depth: Int,
               isMaximizing: Boolean,
               alpha: Double,
-              beta: Double
+              beta: Double,
+              isBlackTurn: Boolean
              ): Double = boundary {
     if (depth == 0 || isGameOver(board)) {
-      // Evaluate from the perspective of the maximizing player
-      return evaluateBoard(board, isMaximizing)
+      return evaluateBoard(board, isBlackTurn)
     } else {
-      // Generate moves for the current player
       val possibleMoves = generateMoves(board, isMaximizing)
       if (possibleMoves.isEmpty) {
-        // If no moves are available, this player loses
         return if (isMaximizing) Double.NegativeInfinity else Double.PositiveInfinity
       } else {
         var (a, b) = (alpha, beta)
@@ -28,26 +26,20 @@ object SeqCheckersAI {
           var maxEval = Double.NegativeInfinity
           for (move <- possibleMoves) {
             val newBoard = applyMove(board, move)
-            val eval = minimax(newBoard, depth - 1, isMaximizing = false, a, b)
+            val eval = minimax(newBoard, depth - 1, false, a, b, isBlackTurn)
             maxEval = math.max(maxEval, eval)
             a = math.max(a, maxEval)
-            if (b <= a) {
-              // Prune the remaining branches
-              boundary.break(maxEval)
-            }
+            if (b <= a) boundary.break(maxEval)
           }
           maxEval
         } else {
           var minEval = Double.PositiveInfinity
           for (move <- possibleMoves) {
             val newBoard = applyMove(board, move)
-            val eval = minimax(newBoard, depth - 1, isMaximizing = true, a, b)
+            val eval = minimax(newBoard, depth - 1, true, a, b, isBlackTurn)
             minEval = math.min(minEval, eval)
             b = math.min(b, minEval)
-            if (b <= a) {
-              // Prune the remaining branches
-              boundary.break(minEval)
-            }
+            if (b <= a) boundary.break(minEval)
           }
           minEval
         }
@@ -72,7 +64,6 @@ object SeqCheckersAI {
       sign * pieceScore(piece, rIdx, cIdx)
     }
 
-    // Use small random value to break ties
     scores.sum + (Random.nextDouble() * 0.1)
   }
 
@@ -80,14 +71,13 @@ object SeqCheckersAI {
     val moves = generateMoves(board, isBlackTurn)
     if (moves.isEmpty) {
       println("No valid moves available.")
-      return None // No valid moves available
+      return None
     }
     if (moves.size == 1) {
       println("Only one possible move. Returning it immediately.")
-      return Some(moves.head) // Return the only move immediately without any calculation
+      return Some(moves.head)
     }
 
-    // Multiple moves available, use iterative deepening
     println(s"${moves.size} possible moves. Starting search...")
     iterativeDeepening(board, isBlackTurn, maxDepth, timeLimitMillis)
   }
@@ -130,12 +120,10 @@ object SeqCheckersAI {
     while (moveIterator.hasNext) {
       val move = moveIterator.next()
       val elapsedMillis = (System.nanoTime() - startTime) / 1_000_000
-      if (elapsedMillis >= timeLimitMillis) {
-        return None
-      }
+      if (elapsedMillis >= timeLimitMillis) return None
 
       val newBoard = applyMove(board, move)
-      val eval = minimax(newBoard, depth - 1, !isBlackTurn, Double.NegativeInfinity, Double.PositiveInfinity)
+      val eval = minimax(newBoard, depth - 1, false, Double.NegativeInfinity, Double.PositiveInfinity, isBlackTurn)
       if (eval > maxEval) {
         maxEval = eval
         bestMove = Some(move)
