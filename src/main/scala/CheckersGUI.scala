@@ -24,7 +24,7 @@ object CheckersGUI extends JFXApp3 {
   var hoveredPiece: Option[(Int, Int)] = None
   var previousMove: Option[Move] = None
   var aiStartTime: Long = 0L
-  val AI_TIME_LIMIT_MS = 5000
+  val AI_TIME_LIMIT_MS = 1000
 
   override def start(): Unit = {
     val canvas = new Canvas(BoardSize * SquareSize, BoardSize * SquareSize)
@@ -42,12 +42,22 @@ object CheckersGUI extends JFXApp3 {
     System.setErr(ps)
 
     def draw(): Unit = {
-      def drawPiece(gc: GraphicsContext, col: Int, row: Int, color: Color): Unit = {
+      def drawPiece(
+          gc: GraphicsContext,
+          col: Int,
+          row: Int,
+          color: Color
+      ): Unit = {
         gc.fill = color
         gc.fillOval(col * SquareSize + 10, row * SquareSize + 10, 60, 60)
       }
 
-      def drawKing(gc: GraphicsContext, col: Int, row: Int, color: Color): Unit = {
+      def drawKing(
+          gc: GraphicsContext,
+          col: Int,
+          row: Int,
+          color: Color
+      ): Unit = {
         drawPiece(gc, col, row, color)
         gc.fill = Color.Gold
         gc.setFont(new Font(20))
@@ -65,11 +75,11 @@ object CheckersGUI extends JFXApp3 {
         }
 
         board(r)(c) match {
-          case Man(true) => drawPiece(gc, c, r, Color.Black)
-          case Man(false) => drawPiece(gc, c, r, Color.White)
-          case King(true) => drawKing(gc, c, r, Color.Black)
+          case Man(true)   => drawPiece(gc, c, r, Color.Black)
+          case Man(false)  => drawPiece(gc, c, r, Color.White)
+          case King(true)  => drawKing(gc, c, r, Color.Black)
           case King(false) => drawKing(gc, c, r, Color.White)
-          case _ =>
+          case _           =>
         }
 
         previousMove.foreach { move =>
@@ -95,7 +105,12 @@ object CheckersGUI extends JFXApp3 {
           if (move.jumped.nonEmpty) {
             gc.fill = Color.Red
             move.jumped.foreach { case (jr, jc) =>
-              gc.fillOval(jc * SquareSize + SquareSize/2 - 5, jr * SquareSize + SquareSize/2 - 5, 10, 10)
+              gc.fillOval(
+                jc * SquareSize + SquareSize / 2 - 5,
+                jr * SquareSize + SquareSize / 2 - 5,
+                10,
+                10
+              )
             }
           }
         }
@@ -119,7 +134,11 @@ object CheckersGUI extends JFXApp3 {
     canvas.onMousePressed = (e: MouseEvent) => {
       val c = (e.getX / SquareSize).toInt
       val r = (e.getY / SquareSize).toInt
-      if (isValidPosition(r, c) && board(r)(c) != Empty && board(r)(c).isBlack == isBlackTurn) {
+      if (
+        isValidPosition(r, c) && board(r)(c) != Empty && board(r)(
+          c
+        ).isBlack == isBlackTurn
+      ) {
         selected = Some((r, c))
         println(s"Piece selected at: ($r, $c)")
       }
@@ -131,7 +150,9 @@ object CheckersGUI extends JFXApp3 {
       selected match {
         case Some((sr, sc)) =>
           val validMoves = generateMoves(board, isBlackTurn)
-          val move = validMoves.find(m => m.fromRow == sr && m.fromCol == sc && m.toRow == r && m.toCol == c)
+          val move = validMoves.find(m =>
+            m.fromRow == sr && m.fromCol == sc && m.toRow == r && m.toCol == c
+          )
           move match {
             case Some(m) =>
               println(s"Move applied: $m")
@@ -167,7 +188,8 @@ object CheckersGUI extends JFXApp3 {
             val bestJump = if (additionalJumps.size == 1) {
               additionalJumps.head
             } else {
-              bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS).getOrElse(additionalJumps.head)
+              bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+                .getOrElse(additionalJumps.head)
             }
             println(s"AI multi-jump: $bestJump")
             previousMove = Some(bestJump)
@@ -198,8 +220,9 @@ object CheckersGUI extends JFXApp3 {
             onFinished = _ => {
               println("AI is thinking...")
               val availableMoves = generateMoves(board, isBlackTurn)
-              val aiMove = if (availableMoves.size == 1) Some(availableMoves.head)
-              else bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
+              val aiMove =
+                if (availableMoves.size == 1) Some(availableMoves.head)
+                else bestMove(board, isBlackTurn, AI_DEPTH, AI_TIME_LIMIT_MS)
 
               aiMove.foreach { am =>
                 println(s"AI move: $am")
@@ -226,10 +249,14 @@ object CheckersGUI extends JFXApp3 {
           var hasAdditionalJumps = false
           previousMove.foreach { pm =>
             if (pm.jumped.isDefined) {
-              val additionalJumps = generateMoves(board, isBlackTurn).filter(move =>
-                move.fromRow == pm.toRow && move.fromCol == pm.toCol && move.jumped.isDefined)
+              val additionalJumps =
+                generateMoves(board, isBlackTurn).filter(move =>
+                  move.fromRow == pm.toRow && move.fromCol == pm.toCol && move.jumped.isDefined
+                )
               if (additionalJumps.nonEmpty) {
-                println("You have additional jumps available. Continue jumping!")
+                println(
+                  "You have additional jumps available. Continue jumping!"
+                )
                 selected = Some((pm.toRow, pm.toCol))
                 draw()
                 hasAdditionalJumps = true
