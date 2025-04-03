@@ -24,7 +24,7 @@ object CheckersGUI extends JFXApp3 {
   var hoveredPiece: Option[(Int, Int)] = None
   var previousMove: Option[Move] = None
   var aiStartTime: Long = 0L
-  val AI_TIME_LIMIT_MS = 5000
+  val AI_TIME_LIMIT_MS = 1000
 
   override def start(): Unit = {
     val canvas = new Canvas(BoardSize * SquareSize, BoardSize * SquareSize)

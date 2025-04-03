@@ -42,3 +42,7 @@ build/
 
 ### Scala ###
 .bsp/
+.bloop/
+.metals/
+project/
+sbt-launch.jar
