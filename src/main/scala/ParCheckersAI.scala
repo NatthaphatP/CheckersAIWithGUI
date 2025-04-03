@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 object ParCheckersAI {
   val AI_DEPTH = 10
-  
+
   def minimax(
       board: Board,
       depth: Int,

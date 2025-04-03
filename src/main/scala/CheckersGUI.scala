@@ -24,11 +24,11 @@ object CheckersGUI extends JFXApp3 {
   var previousMove: Option[Move] = None
   val AI_TIME_LIMIT_MS = 100000 // Set a large time limit for the AI
   val AI_DEPTH = 9
-  
+
   // Add counter for consecutive non-capture moves
   var nonCaptureMovesCount: Int = 0
   val DRAW_AFTER_NON_CAPTURE_MOVES = 40
-  
+
   var blackWins = 0
   var whiteWins = 0
   var draws = 0
@@ -181,7 +181,7 @@ object CheckersGUI extends JFXApp3 {
       if (nonCaptureMovesCount >= DRAW_AFTER_NON_CAPTURE_MOVES) {
         draws += 1
         println("Game drawn after 40 consecutive non-capture moves.")
-        
+
         println(s"Score after game ${gameCount + 1}:")
         println(
           s"Black (ParAI): $blackWins | White (SeqAI): $whiteWins | Draws: $draws\n"
@@ -196,14 +196,16 @@ object CheckersGUI extends JFXApp3 {
         )
 
         // Print the average AI calculation time for both AIs
-        val avgSequentialTime = if (sequentialMoveCount > 0) 
-          totalSequentialTime.toDouble / sequentialMoveCount / 1_000_000_000.0 
-        else 0.0
-        
-        val avgParallelTime = if (parallelMoveCount > 0) 
-          totalParallelTime.toDouble / parallelMoveCount / 1_000_000_000.0 
-        else 0.0
-        
+        val avgSequentialTime =
+          if (sequentialMoveCount > 0)
+            totalSequentialTime.toDouble / sequentialMoveCount / 1_000_000_000.0
+          else 0.0
+
+        val avgParallelTime =
+          if (parallelMoveCount > 0)
+            totalParallelTime.toDouble / parallelMoveCount / 1_000_000_000.0
+          else 0.0
+
         println(
           f"Sequential AI (White): Average time per move: ${avgSequentialTime}%.6f seconds (${sequentialMoveCount} moves)"
         )
@@ -230,8 +232,7 @@ object CheckersGUI extends JFXApp3 {
             }
           }.play()
         }
-      }
-      else if (isGameOver(board)) {
+      } else if (isGameOver(board)) {
         val blackHasMoves = generateMoves(board, isBlackTurn = true).nonEmpty
         val whiteHasMoves = generateMoves(board, isBlackTurn = false).nonEmpty
 
@@ -263,14 +264,16 @@ object CheckersGUI extends JFXApp3 {
         )
 
         // Print the average AI calculation time for both AIs
-        val avgSequentialTime = if (sequentialMoveCount > 0) 
-          totalSequentialTime.toDouble / sequentialMoveCount / 1_000_000_000.0 
-        else 0.0
-        
-        val avgParallelTime = if (parallelMoveCount > 0) 
-          totalParallelTime.toDouble / parallelMoveCount / 1_000_000_000.0 
-        else 0.0
-        
+        val avgSequentialTime =
+          if (sequentialMoveCount > 0)
+            totalSequentialTime.toDouble / sequentialMoveCount / 1_000_000_000.0
+          else 0.0
+
+        val avgParallelTime =
+          if (parallelMoveCount > 0)
+            totalParallelTime.toDouble / parallelMoveCount / 1_000_000_000.0
+          else 0.0
+
         println(
           f"Sequential AI (White): Average time per move: ${avgSequentialTime}%.6f seconds (${sequentialMoveCount} moves)"
         )
@@ -330,16 +333,18 @@ object CheckersGUI extends JFXApp3 {
               case Some(am) =>
                 println(s"AI move: $am")
                 previousMove = Some(am)
-                
+
                 // Update non-capture moves counter
                 if (am.jumped.isEmpty) {
                   nonCaptureMovesCount += 1
-                  println(s"Non-capture moves: $nonCaptureMovesCount/$DRAW_AFTER_NON_CAPTURE_MOVES")
+                  println(
+                    s"Non-capture moves: $nonCaptureMovesCount/$DRAW_AFTER_NON_CAPTURE_MOVES"
+                  )
                 } else {
                   nonCaptureMovesCount = 0
                   println("Capture move! Non-capture counter reset to 0.")
                 }
-                
+
                 gameState = gameState.applyMove(am)
                 draw()
                 if (am.jumped.isDefined) {
