@@ -12,9 +12,10 @@ object CheckersRules {
   }
 
   def pieceMoves(board: Board, r: Int, c: Int, piece: Piece): Seq[Move] = {
-    val dirs = if (piece.isKing) Seq((-1, -1), (-1, 1), (1, -1), (1, 1))
-    else if (piece.isBlack) Seq((-1, -1), (-1, 1)) // Black moves forward (up)
-    else Seq((1, -1), (1, 1)) // White moves forward (down)
+    val dirs =
+      if (piece.isKing) Seq((-1, -1), (-1, 1), (1, -1), (1, 1))
+      else if (piece.isBlack) Seq((-1, -1), (-1, 1)) // Black moves forward (up)
+      else Seq((1, -1), (1, 1)) // White moves forward (down)
 
     dirs.flatMap { case (dr, dc) =>
       val nr = r + dr
@@ -43,14 +44,24 @@ object CheckersRules {
 
   def applyMove(board: Board, move: Move): Board = {
     val piece = board(move.fromRow)(move.fromCol)
-    var newBoard = board.updated(move.fromRow, board(move.fromRow).updated(move.fromCol, Empty))
+    var newBoard = board.updated(
+      move.fromRow,
+      board(move.fromRow).updated(move.fromCol, Empty)
+    )
     move.jumped.foreach { case (jr, jc) =>
-      newBoard = newBoard.updated(jr, newBoard(jr).updated(jc, Empty)) // Remove the jumped piece
+      newBoard = newBoard.updated(
+        jr,
+        newBoard(jr).updated(jc, Empty)
+      ) // Remove the jumped piece
     }
-    
+
     // Handle promotion to king
-    val finalPiece = if (shouldBeKing(piece, move.toRow)) King(piece.isBlack) else piece
-    newBoard.updated(move.toRow, newBoard(move.toRow).updated(move.toCol, finalPiece))
+    val finalPiece =
+      if (shouldBeKing(piece, move.toRow)) King(piece.isBlack) else piece
+    newBoard.updated(
+      move.toRow,
+      newBoard(move.toRow).updated(move.toCol, finalPiece)
+    )
   }
 
   def shouldBeKing(piece: Piece, toRow: Int): Boolean = {
@@ -86,12 +97,12 @@ object CheckersRules {
       move <- pieceMoves(board, r, c, piece)
       if move.jumped.isDefined
     } yield move
-    
+
     // If there are single jumps, return only those
     if (singleJumps.nonEmpty) {
       return singleJumps
     }
-    
+
     // If no jumps are available, find regular moves
     for {
       r <- 0 until BoardSize
@@ -102,7 +113,7 @@ object CheckersRules {
       if move.jumped.isEmpty
     } yield move
   }
-  
+
   sealed trait Piece {
     val isBlack: Boolean
     val isKing: Boolean
@@ -117,11 +128,11 @@ object CheckersRules {
   }
 
   case class Move(
-    fromRow: Int, 
-    fromCol: Int, 
-    toRow: Int, 
-    toCol: Int, 
-    jumped: Option[(Int, Int)]
+      fromRow: Int,
+      fromCol: Int,
+      toRow: Int,
+      toCol: Int,
+      jumped: Option[(Int, Int)]
   )
 
   case object Empty extends Piece {
@@ -130,10 +141,10 @@ object CheckersRules {
   }
 
   case class GameState(
-                        board: Board,
-                        moveHistory: List[Board],
-                        noCaptureCount: Int
-                      ) {
+      board: Board,
+      moveHistory: List[Board],
+      noCaptureCount: Int
+  ) {
     def isDraw: Boolean = {
       noCaptureCount >= 40 || isThreefoldRepetition
     }
