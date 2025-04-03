@@ -1,8 +1,9 @@
-import CheckersRules._
-import scala.concurrent._
-import scala.concurrent.duration._
+import CheckersRules.*
+
+import scala.concurrent.*
+import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Random
+import scala.util.{Random, boundary}
 
 object ParCheckersAI {
   val AI_DEPTH = 100
@@ -13,7 +14,7 @@ object ParCheckersAI {
               alpha: Double,
               beta: Double,
               isBlackTurn: Boolean
-             ): Double = {
+             ): Double = boundary {
     if (depth == 0 || isGameOver(board)) {
       return evaluateBoard(board, isBlackTurn)
     } else {
@@ -30,7 +31,7 @@ object ParCheckersAI {
             val eval = minimax(newBoard, depth - 1, false, a, b, isBlackTurn)
             maxEval = math.max(maxEval, eval)
             a = math.max(a, maxEval)
-            if (b <= a) return maxEval
+            if (b <= a) boundary.break(maxEval)
           }
           maxEval
         } else {
@@ -40,7 +41,7 @@ object ParCheckersAI {
             val eval = minimax(newBoard, depth - 1, true, a, b, isBlackTurn)
             minEval = math.min(minEval, eval)
             b = math.min(b, minEval)
-            if (b <= a) return minEval
+            if (b <= a) boundary.break(minEval)
           }
           minEval
         }

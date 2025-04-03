@@ -22,7 +22,7 @@ object CheckersGUI extends JFXApp3 {
   var isBlackTurn = true
   var hoveredPiece: Option[(Int, Int)] = None
   var previousMove: Option[Move] = None
-  val AI_TIME_LIMIT_MS = 500
+  val AI_TIME_LIMIT_MS = 1000
   val AI_DEPTH = 100
 
   var blackWins = 0
