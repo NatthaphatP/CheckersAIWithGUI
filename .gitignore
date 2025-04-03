@@ -46,3 +46,4 @@ build/
 .metals/
 project/
 sbt-launch.jar
+.scala-build/.scalafmt.conf
